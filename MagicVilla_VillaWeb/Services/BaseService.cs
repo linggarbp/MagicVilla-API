@@ -2,13 +2,14 @@
 using MagicVilla_VillaWeb.Models;
 using MagicVilla_VillaWeb.Services.IServices;
 using Newtonsoft.Json;
+using System.Net;
 using System.Text;
 
 namespace MagicVilla_VillaWeb.Services
 {
     public class BaseService : IBaseService
     {
-        public APIResponse responseModel{ get; set; }
+        public APIResponse responseModel { get; set; }
         public IHttpClientFactory httpClientFactory { get; set; }
         public BaseService(IHttpClientFactory httpClientFactory)
         {
@@ -44,10 +45,28 @@ namespace MagicVilla_VillaWeb.Services
                         break;
                 }
                 HttpResponseMessage apiResponse = null;
-                apiResponse = await client.SendAsync(httpRequestMessage);
-                var apiContent = await apiResponse.Content.ReadAsStringAsync();
-                var APIResponse = JsonConvert.DeserializeObject<T>(apiContent);
 
+                apiResponse = await client.SendAsync(httpRequestMessage);
+
+                var apiContent = await apiResponse.Content.ReadAsStringAsync();
+                try
+                {
+                    APIResponse ApiResponse = JsonConvert.DeserializeObject<APIResponse>(apiContent);
+                    if (apiResponse.StatusCode == HttpStatusCode.BadRequest || apiResponse.StatusCode == HttpStatusCode.NotFound)
+                    {
+                        ApiResponse.StatusCode = HttpStatusCode.BadRequest;
+                        ApiResponse.IsSuccess = false;
+                        var res = JsonConvert.SerializeObject(ApiResponse);
+                        var returnObj = JsonConvert.DeserializeObject<T>(res);
+                        return returnObj;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    var exResponse = JsonConvert.DeserializeObject<T>(apiContent);
+                    return exResponse;
+                }
+                var APIResponse = JsonConvert.DeserializeObject<T>(apiContent);
                 return APIResponse;
             }
             catch (Exception ex)
